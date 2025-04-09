@@ -5,71 +5,74 @@ import scipy.linalg as LA
 
 #GLOBAL VARS
 gamma=1.
-gamm_nn=1
 eta = 0.15
 omega = 10
 Omega_R = 0.1
 
 #FUNCTION DEFINITIONS
+
 def rho_prime(rho_1,rho_2,g,n,dn):
-    #rho is a vector of states
-    R_opt = ((gamma*Omega_R**2)/((gamma**2+(omega**2)*(dn)**2)))
+    #rho is a vector of motional states
+    R_opt_0 = ((gamma*(Omega_R/2)**2)/((0.5*(gamma**2)*(2*n+1)**2+(omega*(dn))**2)))
+    R_opt_min1 = ((gamma*(Omega_R/2)**2)/((0.5*(gamma**2)*(2*n+1)**2+(omega*(dn-1))**2)))
+    R_opt_plus1 = ((gamma*(Omega_R/2)**2)/((0.5*(gamma**2)*(2*n+1)**2+(omega*(dn+1))**2)))
+
     rho_dot=0.
-    '''
-    if n < 7:
-        term1 = rho_2[n]*(-gamma-R_opt*(1-2*eta**2)**2)
-        term2 = rho_1[n]*R_opt*(1-2*eta**2)**2
-        if n > 0:
-            term3 = (R_opt*eta**2)*(rho_1[n-1]-rho_2[n-1])
+    if n<7 and g==2:
+        if n<6:
+            term1 = -gamma*((eta**2)*(1+(2*n+1))+R_opt_0+(eta**2)*n*R_opt_min1+(eta**2)*(n+1)*R_opt_plus1)*rho_2[n]
         else:
-            term3 = 0.0
+            term1 = -gamma*((eta**2)*(1+(2*n+1))+R_opt_0+(eta**2)*n*R_opt_min1)*rho_2[n]
+        term2 = R_opt_0*rho_1[n]
+        if n>0:
+            term3 = R_opt_min1*(eta**2)*n*rho_1[n-1]
+        else:
+            term3 = 0
         if n < 6:
-            term4 = (R_opt*eta**2)*(rho_1[n+1]-rho_2[n+1])
+            term4 = R_opt_plus1*(eta**2)*(n+1)*rho_1[n+1]
         else:
-            term4=0.0
-        if g == 2:
-            rho_dot = term1+term2+term3+term4
-        elif g == 1:
-            rho_dot = -(term1+term2+term3+term4)
+            term4 = 0
+        rho_dot = term1+term2+term3+term4
+    elif n<7 and g==1:
+        if n<6:
+            term1 = -gamma*(R_opt_0+n*(eta**2)*R_opt_min1+(n+1)*(eta**2)*R_opt_plus1)*rho_1[n]
+        else:
+            term1 = -gamma*(R_opt_0+n*(eta**2)*R_opt_min1)*rho_1[n]
+        term2 = (1+R_opt_0)*rho_2[n]
+        if n>0:
+            term3 = n*(eta**2)*(1+R_opt_min1)*rho_2[n-1]
+        else:
+            term3 = 0
+        if n<6:
+            term4 = (n+1)*(eta**2)*(1+R_opt_plus1)*rho_2[n+1]
+        else:
+            term4 = 0
+
+        rho_dot = term1+term2+term3+term4
+
     return(rho_dot)
-    
+
     '''
-    if g == 1 and n <7:
-        term1=gamma*rho_2[n]
-        if n>0:
-            term3=(eta**2)*n*rho_2[n-1]
-            term5=-0.5*R_opt*(eta**2)*n*(rho_1[n]-rho_2[n-1])
+    if n<7:
+        term1 = (-gamma*(n+1)-R_opt_0*((1-2*eta**2)**2))*rho_2[n]
+        term2 = (gamma*n+R_opt_0*((1-2*eta**2)**2))*rho_1[n]
+        if n<6:
+            term3 = -R_opt_plus1*(eta**2)*(rho_2[n+1]-rho_1[n+1])
         else:
             term3=0
-            term5=0
-        term4=-0.5*R_opt*(rho_1[n]-rho_2[n])
-        if n<6:
-            term2=gamma*(eta**2)*(n+1)*rho_2[n+1]
-            term6=-0.5*R_opt*(eta**2)*(n+1)*(rho_1[n]-rho_2[n+1])
-        else:
-            term2=0
-            term6=0
-        rho_dot = term1+term2+term3+term4+term5+term6
-        #print(rho_dot)
-        return(rho_dot)
-    
-    elif g == 2 and n<7:
-        term2=0.5*R_opt*(rho_1[n]-rho_2[n])
         if n>0:
-            term3=0.5*R_opt*n*(eta**2)*(rho_1[n-1]-rho_2[n])
-        else:
-            term3=0
-        if n<6:
-            term4=0.5*(n+1)*(eta**2)*R_opt*(rho_1[n+1]-rho_2[n])
-            term1=-gamma*(1+(2*n+1)*(eta**2))*rho_2[n]
+            term4 = -R_opt_min1*(eta**2)*(rho_2[n-1]-rho_1[n-1])
         else:
             term4=0
-            term1=0
-        rho_dot = term1+term2+term3+term4
-        #print(rho_dot)
-        return(rho_dot)
-    else:
-        return(0)
+        
+        if g==1:
+            rho_dot = term1+term2+term3+term4
+        elif g==2:
+            rho_dot = -(term1+term2+term3+term4)
+
+    return(rho_dot)
+    '''
+ 
 
     
 #initialize population in a thermal state
@@ -77,14 +80,18 @@ def rho_prime(rho_1,rho_2,g,n,dn):
 # T = 2*hbar*omega/k (set hbar = 1)
 def initialize_pop():
     rho=[]
+    rho_weighted=0
     for n in range(7):
         H = n*omega
         rho_n = np.exp(-H/(2*omega))
         rho.append(rho_n)
+        rho_weighted+=rho_n*n
     rho = np.array(rho)
     trace = np.sum(rho)
+    print((rho_weighted)/trace)
     rho = rho/trace
-    return(rho)
+    
+    return(rho, rho_weighted/trace)
 
 # let the state evolve
 def update_pop(rho_1, rho_2, dt, dn):
@@ -98,46 +105,27 @@ def update_pop(rho_1, rho_2, dt, dn):
     return(rho_1, rho_2)
 
 ##-----------------------------------------------------------------------------------------------------------
-dt = .1
-ts = np.linspace(0,2000,20000)
+dt = 1
+ts = np.linspace(0,5000,5000)
 
-#initialize our populations!
-rho_g1 = initialize_pop()
-rho_g2 = np.array([0.00]*7)
-
-
-#evolve! start with dn = -1
-rhos = [(rho_g1, rho_g2)]
-rho1s=[rho_g1]
-n_avg=[]
-for t in ts:
-    rho_g1, rho_g2 = update_pop(rho_g1, rho_g2, dt, -0.5)
-    rhos.append((rho_g1, rho_g2))
-    rho1s.append(rho_g1)
-    weighted_avg = 0
-    for n in range(7):
-        weighted_avg += rho_g1[n]*n
-    weighted_avg = weighted_avg/np.sum(rho_g1)
-    n_avg.append(weighted_avg)
-
-rho_arrays=[]
-for n in range(7):
-    n_array=[]
-    for t in range(2000):
-        rho_t = rho1s[t]
-        rho_t_n = rho_t[n]
-        n_array.append(rho_t_n)
-    rho_arrays.append(n_array)
-
-
-plt.plot(ts, n_avg, color='blue')
-#colors = plt.cm.spring(np.linspace(0,1,7))
-#plt.gca().set_prop_cycle(cycler('color',colors))
-#for i in range(7):
-#    plt.plot(ts, rho_arrays[i],label="Fraction of pop. in state "+str(i))
-plt.xlabel("time [s]")
+dns = [-1.0, -0.5, 0.0]
+colors = plt.cm.YlGnBu(np.linspace(0.3,0.8,3))
+plt.gca().set_prop_cycle(cycler('color',colors))
+for dn in dns:
+    #reinitialize populations for every dn
+    rho_g1, rho_weighted = initialize_pop()
+    rho_g2 = np.array([0.00]*7)
+    n_avg = [rho_weighted]
+    for t in ts[:-1]:
+        rho_g1, rho_g2 = update_pop(rho_g1, rho_g2, dt, dn)
+        weighted_avg = 0
+        for n in range(7):
+            weighted_avg += n*rho_g1[n]
+        weighted_avg = weighted_avg/np.sum(rho_g1)
+        n_avg.append(weighted_avg)
+    plt.plot(ts, n_avg, label = "$\\delta n=$"+str(dn))
+plt.xlabel("time [arb units]")
 plt.ylabel("$\\langle n \\rangle$")
-plt.title("$\\delta n=-0.5$")
-#plt.legend()
-plt.savefig("n_avg_halfway.pdf")
+plt.legend()
+plt.savefig("n_avgs.pdf")
 plt.close()
